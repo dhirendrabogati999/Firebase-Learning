@@ -1,4 +1,6 @@
-
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_learning/screens/home_screen.dart';
 import 'package:firebase_learning/screens/login_screen.dart';
 import 'package:flutter/material.dart';
 
@@ -11,6 +13,87 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   bool obscurePassword = true;
+  final usernameController = TextEditingController();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+
+  bool isLoading = false;
+
+  Future<void> signup() async {
+    final username = usernameController.text.trim();
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    if (username.isEmpty || email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill all fields'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      await userCredential.user?.updateDisplayName(username);
+
+      final user = userCredential.user!;
+
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'username': username,
+        'email': email,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const HomeScreen(),
+        ),
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account created successfully!'),
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message ?? 'Signup failed'),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Other Error: $e');
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Something went wrong'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,11 +104,9 @@ class _SignupScreenState extends State<SignupScreen> {
           color: Colors.white,
         ),
       ),
-
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -51,9 +132,10 @@ class _SignupScreenState extends State<SignupScreen> {
               const SizedBox(height: 30),
 
               // Username
-              const TextField(
-                style: TextStyle(color: Colors.white),
-                decoration: InputDecoration(
+              TextField(
+                controller: usernameController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
                   labelText: 'Username',
                   hintText: 'Enter your name',
                   prefixIcon: Icon(Icons.person_outline),
@@ -63,10 +145,11 @@ class _SignupScreenState extends State<SignupScreen> {
               const SizedBox(height: 18),
 
               // Email
-              const TextField(
+              TextField(
+                controller: emailController,
                 keyboardType: TextInputType.emailAddress,
-                style: TextStyle(color: Colors.white),
-                decoration: InputDecoration(
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
                   labelText: 'Email',
                   hintText: 'Enter your email',
                   prefixIcon: Icon(Icons.email_outlined),
@@ -77,13 +160,13 @@ class _SignupScreenState extends State<SignupScreen> {
 
               // Password
               TextField(
+                controller: passwordController,
                 obscureText: obscurePassword,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'Password',
                   hintText: 'Create a password',
                   prefixIcon: const Icon(Icons.lock_outline),
-
                   suffixIcon: IconButton(
                     onPressed: () {
                       setState(() {
@@ -105,8 +188,9 @@ class _SignupScreenState extends State<SignupScreen> {
               // Sign Up Button
               _GradientButton(
                 text: 'Sign Up',
+                isLoading: isLoading,
                 onPressed: () {
-                  // Firebase signup pachhi jodchhau.
+                  signup();
                 },
               ),
 
@@ -132,7 +216,6 @@ class _SignupScreenState extends State<SignupScreen> {
                         color: Colors.white60,
                       ),
                     ),
-
                     TextButton(
                       onPressed: () {
                         Navigator.pushReplacement(
@@ -164,10 +247,12 @@ class _SignupScreenState extends State<SignupScreen> {
 class _GradientButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
+  final bool isLoading;
 
   const _GradientButton({
     required this.text,
     required this.onPressed,
+    required this.isLoading,
   });
 
   @override
@@ -185,18 +270,27 @@ class _GradientButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
       ),
       child: ElevatedButton(
-        onPressed: onPressed,
+        onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
         ),
-        child: Text(
-          text,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        child: isLoading
+            ? const SizedBox(
+                height: 22,
+                width: 22,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              )
+            : Text(
+                text,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
       ),
     );
   }
