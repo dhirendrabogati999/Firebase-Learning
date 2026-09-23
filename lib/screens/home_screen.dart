@@ -1,4 +1,5 @@
 
+import 'package:firebase_learning/screens/profile_screen.dart';
 import 'package:flutter/material.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -6,10 +7,11 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return Scaffold(      
       backgroundColor: const Color(0xFF071326),
 
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: const Color(0xFF071326),
         title: const Text(
           'ChatSphere',
@@ -20,7 +22,11 @@ class HomeScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context, MaterialPageRoute(builder: (_) => const ProfileScreen()),
+              );
+            },
             icon: const Icon(
               Icons.person_outline,
               color: Colors.white,

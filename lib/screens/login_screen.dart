@@ -1,4 +1,6 @@
-
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_learning/screens/home_screen.dart';
+import 'package:firebase_learning/services/auth_service.dart';
 import 'package:flutter/material.dart';
 
 import 'signup_screen.dart';
@@ -13,6 +15,12 @@ class SigninScreen extends StatefulWidget {
 class _SigninScreenState extends State<SigninScreen> {
   bool obscurePassword = true;
   bool rememberMe = false;
+  bool isLoading = false;
+
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+
+  final AuthService _authService = AuthService();
 
   @override
   Widget build(BuildContext context) {
@@ -23,11 +31,9 @@ class _SigninScreenState extends State<SigninScreen> {
           color: Colors.white,
         ),
       ),
-
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -53,10 +59,11 @@ class _SigninScreenState extends State<SigninScreen> {
               const SizedBox(height: 30),
 
               // Email
-              const TextField(
+              TextField(
+                controller: emailController,
                 keyboardType: TextInputType.emailAddress,
-                style: TextStyle(color: Colors.white),
-                decoration: InputDecoration(
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
                   labelText: 'Email',
                   hintText: 'Enter your email',
                   prefixIcon: Icon(Icons.email_outlined),
@@ -67,13 +74,13 @@ class _SigninScreenState extends State<SigninScreen> {
 
               // Password
               TextField(
+                controller: passwordController,
                 obscureText: obscurePassword,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'Password',
                   hintText: 'Enter your password',
                   prefixIcon: const Icon(Icons.lock_outline),
-
                   suffixIcon: IconButton(
                     onPressed: () {
                       setState(() {
@@ -108,9 +115,7 @@ class _SigninScreenState extends State<SigninScreen> {
                       },
                     ),
                   ),
-
                   const SizedBox(width: 6),
-
                   const Text(
                     'Remember me',
                     style: TextStyle(
@@ -118,9 +123,7 @@ class _SigninScreenState extends State<SigninScreen> {
                       fontSize: 13,
                     ),
                   ),
-
                   const Spacer(),
-
                   TextButton(
                     onPressed: () {
                       // Forgot password feature pachhi jodchhau.
@@ -141,8 +144,47 @@ class _SigninScreenState extends State<SigninScreen> {
               // Login Button
               _GradientButton(
                 text: 'Login',
-                onPressed: () {
-                  // Firebase login pachhi jodchhau.
+                isLoading: isLoading,
+                onPressed: () async {
+                  final email = emailController.text.trim();
+                  final password = passwordController.text.trim();
+
+                  if (email.isEmpty || password.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please enter email and password'),
+                      ),
+                    );
+                    return;
+                  }
+
+                  setState(() {
+                    isLoading = true;
+                  });
+
+                  try {
+                    await _authService.login(
+                      email: email,
+                      password: password,
+                    );
+
+                    if (!mounted) return;
+
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const HomeScreen(),
+                      ),
+                    );
+                  } on FirebaseAuthException catch (e) {
+                    if (!mounted) return;
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(e.message ?? 'Login failed'),
+                      ),
+                    );
+                  }
                 },
               ),
 
@@ -204,7 +246,6 @@ class _SigninScreenState extends State<SigninScreen> {
                         color: Colors.white60,
                       ),
                     ),
-
                     TextButton(
                       onPressed: () {
                         Navigator.pushReplacement(
@@ -235,10 +276,12 @@ class _SigninScreenState extends State<SigninScreen> {
 class _GradientButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
+  final bool isLoading;
 
   const _GradientButton({
     required this.text,
     required this.onPressed,
+    required this.isLoading,
   });
 
   @override
@@ -256,18 +299,27 @@ class _GradientButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
       ),
       child: ElevatedButton(
-        onPressed: onPressed,
+        onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
         ),
-        child: Text(
-          text,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        child: isLoading
+            ? const SizedBox(
+                height: 22,
+                width: 22,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              )
+            : Text(
+                text,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
       ),
     );
   }
