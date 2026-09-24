@@ -1,15 +1,25 @@
-
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_learning/screens/chat_screen.dart';
 import 'package:firebase_learning/screens/profile_screen.dart';
 import 'package:flutter/material.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(      
-      backgroundColor: const Color(0xFF071326),
+  State<HomeScreen> createState() => _HomeScreenState();
+}
 
+class _HomeScreenState extends State<HomeScreen> {
+  final TextEditingController searchController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF071326),
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: const Color(0xFF071326),
@@ -24,7 +34,10 @@ class HomeScreen extends StatelessWidget {
           IconButton(
             onPressed: () {
               Navigator.push(
-                context, MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ProfileScreen(),
+                ),
               );
             },
             icon: const Icon(
@@ -34,14 +47,41 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
-
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24),
-
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Search bar
+              TextField(
+                controller: searchController,
+                onChanged: (value) {
+                  setState(() {});
+                },
+                decoration: InputDecoration(
+                  hintText: 'Search users...',
+                  hintStyle: const TextStyle(
+                    color: Colors.white54,
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: Colors.white54,
+                  ),
+                  filled: true,
+                  fillColor: const Color(0xFF12213A),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                style: const TextStyle(
+                  color: Colors.white,
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
               const Text(
                 'Welcome to ChatSphere! 👋',
                 style: TextStyle(
@@ -51,7 +91,7 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 5),
 
               const Text(
                 'Connect with your friends and start chatting.',
@@ -61,89 +101,114 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 20),
 
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF7C3AED),
-                      Color(0xFF2563EB),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(18),
-                ),
+              // Users list
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('users')
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    }
 
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.chat_bubble_outline,
-                      color: Colors.white,
-                      size: 35,
-                    ),
-
-                    SizedBox(height: 15),
-
-                    Text(
-                      'Your Chats',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-
-                    SizedBox(height: 8),
-
-                    Text(
-                      'Your conversations will appear here.',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 25),
-
-              const Text(
-                'Recent Chats',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              const SizedBox(height: 15),
-
-              const Expanded(
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.chat_outlined,
-                        color: Colors.white38,
-                        size: 55,
-                      ),
-
-                      SizedBox(height: 12),
-
-                      Text(
-                        'No conversations yet',
-                        style: TextStyle(
-                          color: Colors.white60,
-                          fontSize: 15,
+                    if (snapshot.hasError) {
+                      return const Center(
+                        child: Text(
+                          'Something went wrong',
+                          style: TextStyle(
+                            color: Colors.white60,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      );
+                    }
+
+                    final users = snapshot.data?.docs ?? [];
+
+                    final searchText = searchController.text.toLowerCase();
+
+                    final otherUsers = users.where((user) {
+                      final uid = user['uid'];
+                      final username =
+                          user['username']?.toString().toLowerCase() ?? '';
+
+                      if (uid == currentUser?.uid) {
+                        return false;
+                      }
+
+                      return username.contains(searchText);
+                    }).toList();
+
+                    if (otherUsers.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'No users found',
+                          style: TextStyle(
+                            color: Colors.white60,
+                            fontSize: 16,
+                          ),
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      itemCount: otherUsers.length,
+                      itemBuilder: (context, index) {
+                        final user = otherUsers[index];
+
+                        final username = user['username'] ?? 'Unknown User';
+
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 6,
+                          ),
+                          leading: CircleAvatar(
+                            radius: 27,
+                            backgroundColor: const Color(0xFF7C3AED),
+                            child: Text(
+                              username.isNotEmpty
+                                  ? username[0].toUpperCase()
+                                  : '?',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            username,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          subtitle: const Text(
+                            'Start a conversation',
+                            style: TextStyle(
+                              color: Colors.white54,
+                              fontSize: 14,
+                            ),
+                          ),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ChatScreen(
+                                  username: username,
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
                 ),
               ),
             ],
