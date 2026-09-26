@@ -162,6 +162,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
                         final username = user['username'] ?? 'Unknown User';
 
+                        final receiverId = user['uid'];
+
+                        final currentUserId =
+                            FirebaseAuth.instance.currentUser!.uid;
+
+                        final ids = [currentUserId, receiverId];
+                        ids.sort();
+
+                        final chatId = ids.join('_');
+
                         return ListTile(
                           contentPadding: const EdgeInsets.symmetric(
                             vertical: 6,
@@ -188,12 +198,39 @@ class _HomeScreenState extends State<HomeScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          subtitle: const Text(
-                            'Start a conversation',
-                            style: TextStyle(
-                              color: Colors.white54,
-                              fontSize: 14,
-                            ),
+                          subtitle: StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('chats')
+                                .doc(chatId)
+                                .collection('messages')
+                                .orderBy('timestamp', descending: true)
+                                .limit(1)
+                                .snapshots(),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData ||
+                                  snapshot.data!.docs.isEmpty) {
+                                return const Text(
+                                  'Start a conversation',
+                                  style: TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 13,
+                                  ),
+                                );
+                              }
+
+                              final message =
+                                  snapshot.data!.docs.first['message'];
+
+                              return Text(
+                                message,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 13,
+                                ),
+                              );
+                            },
                           ),
                           onTap: () {
                             Navigator.push(
@@ -201,6 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               MaterialPageRoute(
                                 builder: (_) => ChatScreen(
                                   username: username,
+                                  receiverId: user['uid'],
                                 ),
                               ),
                             );
